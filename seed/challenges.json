@@ -1,0 +1,17 @@
+[
+  {
+    "slug": "sum-two-numbers",
+    "title": "Sum Two Numbers",
+    "description": "Read two integers from stdin, separated by a space, and print their sum.",
+    "difficulty": 1,
+    "language": "javascript",
+    "starterCode": "// read from stdin, print the sum\n",
+    "timeLimitMs": 2000,
+    "skills": [],
+    "isPublished": false,
+    "testCases": [
+      { "input": "2 3", "expectedOutput": "5", "isHidden": false },
+      { "input": "10 -4", "expectedOutput": "6", "isHidden": true }
+    ]
+  }
+]

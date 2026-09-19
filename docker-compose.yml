@@ -1,0 +1,47 @@
+version: "3.9"
+
+# Network isolation (Phase 0 acceptance criteria):
+# - `data` network: mongo + redis + api + worker (trusted internals)
+# - `judge` network: piston + worker ONLY. Piston has no route to mongo/redis/api.
+# - worker sits on both networks because it needs to talk to Mongo/Redis AND to Piston,
+#   but piston itself never sees the data network.
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - data
+
+  piston:
+    image: ghcr.io/engineer-man/piston
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "2000:2000"
+    volumes:
+      - piston-data:/piston
+    networks:
+      - judge   # deliberately NOT on `data` — no route to mongo/redis
+
+networks:
+  data:
+    driver: bridge
+  judge:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  piston-data:

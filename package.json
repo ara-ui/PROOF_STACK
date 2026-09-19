@@ -1,0 +1,27 @@
+{
+  "name": "proofstack",
+  "version": "0.0.0",
+  "description": "Developer skill-verification platform. See docs/ARCHITECTURE.md and docs/ROADMAP.md.",
+  "private": true,
+  "main": "dist/server.js",
+"scripts": {
+  "dev": "tsx watch src/server.ts",
+  "worker": "tsx src/workers/evaluation.worker.ts",
+  "build": "tsc",
+  "seed": "tsx src/scripts/seed.ts"
+},
+  "dependencies": {
+    "bullmq": "^6.3.8",
+    "dotenv": "^18.0.0",
+    "express": "^5.2.1",
+    "ioredis": "^6.0.0",
+    "mongoose": "^9.10.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  }
+}
