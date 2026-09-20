@@ -5,13 +5,49 @@
     "description": "Read two integers from stdin, separated by a space, and print their sum.",
     "difficulty": 1,
     "language": "javascript",
-    "starterCode": "// read from stdin, print the sum\n",
+    "starterCode": "const data = require('fs').readFileSync(0, 'utf8').trim();\nconst [a, b] = data.split(' ').map(Number);\n// TODO: print the sum\n",
     "timeLimitMs": 2000,
     "skills": [],
-    "isPublished": false,
+    "isPublished": true,
     "testCases": [
-      { "input": "2 3", "expectedOutput": "5", "isHidden": false },
-      { "input": "10 -4", "expectedOutput": "6", "isHidden": true }
+      { "input": "2 3", "expectedOutput": "5", "isHidden": false, "category": "basic" },
+      { "input": "10 -4", "expectedOutput": "6", "isHidden": true, "category": "basic" },
+      { "input": "0 0", "expectedOutput": "0", "isHidden": true, "category": "edge_case" }
+    ]
+  },
+  {
+    "slug": "fizzbuzz",
+    "title": "FizzBuzz",
+    "description": "Read one integer n from stdin. Print 'Fizz' if divisible by 3, 'Buzz' if divisible by 5, 'FizzBuzz' if both, otherwise the number itself.",
+    "difficulty": 1,
+    "language": "javascript",
+    "starterCode": "const n = Number(require('fs').readFileSync(0, 'utf8').trim());\n// TODO: print Fizz/Buzz/FizzBuzz/n\n",
+    "timeLimitMs": 2000,
+    "skills": [],
+    "isPublished": true,
+    "testCases": [
+      { "input": "3", "expectedOutput": "Fizz", "isHidden": false, "category": "basic" },
+      { "input": "5", "expectedOutput": "Buzz", "isHidden": false, "category": "basic" },
+      { "input": "15", "expectedOutput": "FizzBuzz", "isHidden": true, "category": "validation" },
+      { "input": "7", "expectedOutput": "7", "isHidden": true, "category": "validation" },
+      { "input": "0", "expectedOutput": "FizzBuzz", "isHidden": true, "category": "edge_case" }
+    ]
+  },
+  {
+    "slug": "max-in-array",
+    "title": "Maximum in Array",
+    "description": "Read a line of space-separated integers from stdin and print the largest one.",
+    "difficulty": 2,
+    "language": "javascript",
+    "starterCode": "const nums = require('fs').readFileSync(0, 'utf8').trim().split(' ').map(Number);\n// TODO: print the maximum value\n",
+    "timeLimitMs": 2000,
+    "skills": [],
+    "isPublished": true,
+    "testCases": [
+      { "input": "1 5 3", "expectedOutput": "5", "isHidden": false, "category": "basic" },
+      { "input": "-1 -5 -3", "expectedOutput": "-1", "isHidden": true, "category": "edge_case" },
+      { "input": "7", "expectedOutput": "7", "isHidden": true, "category": "edge_case" },
+      { "input": "4 4 4 4", "expectedOutput": "4", "isHidden": true, "category": "validation" }
     ]
   }
 ]

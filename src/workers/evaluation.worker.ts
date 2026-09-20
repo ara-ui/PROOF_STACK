@@ -5,7 +5,14 @@ import { EVALUATION_QUEUE_NAME, type EvaluationJobData } from '../queues/evaluat
 import { Submission } from '../models/Submission';
 import { Challenge } from '../models/Challenge';
 import { executeOnPiston, JudgeUnavailableError } from '../services/piston.service';
-import { TERMINAL_STATUSES, type FailureReason, type SubmissionStatus, type TestCaseResult } from '../types/submission';
+import { COMPILE_ERROR_PATTERNS } from '../config/constants';
+import {
+  TERMINAL_STATUSES,
+  type FailureReason,
+  type SubmissionStatus,
+  type TestCaseResult,
+  type CategoryBreakdown,
+} from '../types/submission';
 
 /**
  * This file is a genuinely separate entrypoint from src/server.ts — it is
@@ -29,7 +36,10 @@ function normalize(s: string): string {
  */
 async function evaluateSubmission(
   sourceCode: string,
-  challenge: { timeLimitMs: number; testCases: { input: string; expectedOutput: string; isHidden: boolean }[] },
+  challenge: {
+    timeLimitMs: number;
+    testCases: { input: string; expectedOutput: string; isHidden: boolean; category: string }[];
+  },
 ): Promise<
   | { kind: 'JUDGE_FAILURE'; reason: FailureReason; message: string }
   | { kind: 'TIMEOUT' }
@@ -55,16 +65,19 @@ async function evaluateSubmission(
     }
 
     // Heuristic for JS on Piston: there's no separate compile step, so a
-    // non-zero exit with "SyntaxError" in stderr on the FIRST test case is
-    // treated as a compile-time problem; any other non-zero exit is a
-    // runtime error. This is a simplification worth revisiting once real
-    // submissions show what Piston actually returns for JS — noted here
-    // rather than treated as settled.
+    // non-zero exit is classified by matching stderr against
+    // COMPILE_ERROR_PATTERNS (config/constants.ts). Only meaningful on the
+    // FIRST test case — the same source code runs for every test case, so
+    // if it were going to fail to parse, it always fails on test one; a
+    // later test case failing this way would mean something else broke
+    // between runs, which we still call RUNTIME_ERROR rather than invent a
+    // third category for. This remains a heuristic, not a real compile
+    // step — worth revisiting against real Piston output over time.
     if (outcome.exitCode !== 0 && outcome.exitCode !== null) {
-      const looksLikeSyntaxError = /SyntaxError/.test(outcome.stderr);
+      const looksLikeCompileError = COMPILE_ERROR_PATTERNS.some((pattern) => pattern.test(outcome.stderr));
       return {
         kind: 'JUDGE_FAILURE',
-        reason: looksLikeSyntaxError && index === 0 ? 'COMPILE_ERROR' : 'RUNTIME_ERROR',
+        reason: looksLikeCompileError && index === 0 ? 'COMPILE_ERROR' : 'RUNTIME_ERROR',
         message: outcome.stderr || `Process exited with code ${outcome.exitCode}`,
       };
     }
@@ -75,6 +88,7 @@ async function evaluateSubmission(
       index,
       passed,
       isHidden: testCase.isHidden,
+      category: testCase.category,
       // Hidden test case actual/expected output is not stored on the
       // result we'll eventually return via the API — minimal safeguard
       // against leaking answers, see src/types/submission.ts.
@@ -85,6 +99,21 @@ async function evaluateSubmission(
   }
 
   return { kind: 'COMPLETED', testResults };
+}
+
+function buildCategoryBreakdown(testResults: TestCaseResult[]): CategoryBreakdown[] {
+  const byCategory = new Map<string, { passed: number; total: number }>();
+  for (const result of testResults) {
+    const bucket = byCategory.get(result.category) ?? { passed: 0, total: 0 };
+    bucket.total += 1;
+    if (result.passed) bucket.passed += 1;
+    byCategory.set(result.category, bucket);
+  }
+  return Array.from(byCategory.entries()).map(([category, { passed, total }]) => ({
+    category,
+    passed,
+    total,
+  }));
 }
 
 async function processJob(job: Job<EvaluationJobData>): Promise<void> {
@@ -133,7 +162,12 @@ async function processJob(job: Job<EvaluationJobData>): Promise<void> {
 
   const passedCount = outcome.testResults.filter((t) => t.passed).length;
   const totalCount = outcome.testResults.length;
-  const result = { passedCount, totalCount, testResults: outcome.testResults };
+  const result = {
+    passedCount,
+    totalCount,
+    testResults: outcome.testResults,
+    categoryBreakdown: buildCategoryBreakdown(outcome.testResults),
+  };
 
   if (passedCount === totalCount) {
     await writeTerminalState(submissionId, 'PASSED', null, result);
@@ -153,7 +187,12 @@ async function writeTerminalState(
   submissionId: string,
   status: SubmissionStatus,
   failureReason: FailureReason | null,
-  result: { passedCount: number; totalCount: number; testResults: TestCaseResult[] } | null,
+  result: {
+    passedCount: number;
+    totalCount: number;
+    testResults: TestCaseResult[];
+    categoryBreakdown: CategoryBreakdown[];
+  } | null,
 ): Promise<void> {
   if (!TERMINAL_STATUSES.includes(status)) {
     throw new Error(`writeTerminalState called with non-terminal status ${status}`);

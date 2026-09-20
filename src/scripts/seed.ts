@@ -13,7 +13,7 @@ interface SeedChallenge {
   timeLimitMs: number;
   skills: unknown[];
   isPublished: boolean;
-  testCases: { input: string; expectedOutput: string; isHidden: boolean }[];
+  testCases: { input: string; expectedOutput: string; isHidden: boolean; category: string }[];
 }
 
 async function main() {

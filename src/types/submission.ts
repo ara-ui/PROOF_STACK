@@ -36,17 +36,30 @@ export interface TestCaseResult {
   index: number;
   passed: boolean;
   isHidden: boolean;
+  // Category is always shown, even for hidden test cases — it's structural
+  // information ("Edge Cases: 4/5"), not an answer, so it doesn't need the
+  // same masking as actualOutput/expectedOutput.
+  category: string;
   // Actual stdout is included only for visible test cases. Hidden test
   // case answers are not echoed back — a minimal safeguard, not the full
-  // Phase 2 challenge system.
+  // Phase 2+ challenge-authoring system.
   actualOutput?: string;
   expectedOutput?: string;
   timeMs?: number;
   truncated?: boolean;
 }
 
+export interface CategoryBreakdown {
+  category: string;
+  passed: number;
+  total: number;
+}
+
 export interface SubmissionResult {
   passedCount: number;
   totalCount: number;
   testResults: TestCaseResult[];
+  // Phase 2: lets the API report "Basic: 8/8, Edge Cases: 4/5" instead of
+  // one flat passedCount/totalCount pair.
+  categoryBreakdown: CategoryBreakdown[];
 }

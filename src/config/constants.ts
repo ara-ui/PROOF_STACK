@@ -20,3 +20,17 @@ export const MAX_OUTPUT_BYTES = 65_536;
 // the candidate's process; this is a second, outer backstop per the
 // blueprint's "external timeout as backstop" guidance.
 export const PISTON_HTTP_BUFFER_MS = 5_000;
+
+// Phase 2: patterns checked against stderr on the FIRST test case's
+// non-zero exit to guess "candidate's code never ran at all" (compile-like)
+// vs "it ran and then crashed" (runtime). This is still a heuristic, not a
+// real compile step — JS has no separate compile phase in Piston, so this
+// is inference from stderr text, not a guarantee. Expanded from Phase 1's
+// single SyntaxError check after seeing V8 also reports some fatal parse
+// issues without that literal string.
+export const COMPILE_ERROR_PATTERNS = [
+  /SyntaxError/,
+  /Unexpected token/,
+  /Unexpected end of input/,
+  /is not defined.*\n.*at Object\.<anonymous>/, // top-level ReferenceError before any user code ran
+] as const;

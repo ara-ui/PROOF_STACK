@@ -12,22 +12,22 @@ below. Everything in this document, including that deferral, is final.
 
 ---
 
-## PHASE 0 — Repository & Architecture Lock
+## PHASE 0 — Repository & Architecture Lock — **complete**
 
 Establish conventions and infrastructure. No business logic.
 
 **Acceptance criteria:**
-- [ ] Folder structure matches the blueprint's `src/` layout
-- [ ] `docker-compose.yml` runs Mongo, Redis, and a **self-hosted** Piston container
-- [ ] `[CORRECTED]` Piston container has **no network route** to Mongo or Redis — confirmed in compose network config, not assumed
-- [ ] `.env.example` defines every variable Phase 1 needs (`MONGO_URI`, `REDIS_URL`, `PISTON_URL`) — no `JWT_SECRET` yet, that arrives in Phase 3
-- [ ] Package manager, JS vs TypeScript, and Mongoose strict-mode decided and documented
-- [ ] `sanitizeFilter: true` set globally on the Mongoose connection now, even though no user-facing query exists yet — so it's never accidentally omitted later
-- [ ] One seeded challenge with two test cases committed as seed data
+- [x] Folder structure matches the blueprint's `src/` layout
+- [x] `docker-compose.yml` runs Mongo, Redis, and a **self-hosted** Piston container — confirmed running on the actual dev machine
+- [ ] `[CORRECTED]` Piston container has **no network route** to Mongo or Redis — the compose config declares this (separate `data`/`judge` networks), but it has only been confirmed that Piston *can* reach the internet, not that it *cannot* reach Mongo/Redis. Still open.
+- [ ] `.env.example` defines every variable Phase 1 needs — currently **stale**: it's missing `PISTON_LANGUAGE`/`PISTON_VERSION`, which `src/config/env.ts` does read (with defaults). The real `.env` on the dev machine apparently has working values (Piston confirmed serving Node 18.15.0 and 20.11.1), but `.env.example` itself hasn't been updated to document them.
+- [x] Package manager, JS vs TypeScript, and Mongoose strict-mode decided and documented
+- [x] `sanitizeFilter: true` set globally on the Mongoose connection
+- [x] Seeded challenge(s) committed as seed data — originally one challenge/two test cases; expanded in Phase 2 to three challenges
 
 ---
 
-## PHASE 1 — Walking Skeleton / Core Evaluation Pipeline
+## PHASE 1 — Walking Skeleton / Core Evaluation Pipeline — **verified (partial)**
 
 No authentication. Hardcoded user ID only.
 
@@ -41,23 +41,28 @@ Lifecycle: `QUEUED → RUNNING → PASSED / FAILED / TIMEOUT / ERROR`, with a
 separate `failureReason` field distinguishing candidate failures from
 infrastructure/judge failures.
 
-**Acceptance criteria:**
-- [ ] Submission created through the API; API returns `202` immediately, does not wait on execution
-- [ ] Job enters BullMQ; a separate worker process consumes it
-- [ ] Worker executes code through self-hosted Piston; result persisted
-- [ ] Status transitions correctly through all states
-- [ ] At least one challenge produces both PASSED and FAILED
-- [ ] Timeout and error cases handled and distinguished via `failureReason`
-- [ ] `[CORRECTED]` Idempotency is real, not assumed: `jobId = submissionId` dedupes on enqueue; an atomic status guard (`updateOne` matching current status) prevents double-processing on redelivery; a terminal-state guard stops a late/duplicate write from overwriting a completed result. Demonstrate by enqueuing the same submission twice.
-- [ ] `[CORRECTED]` Source code capped at 64KB before enqueue; judge stdout capped (e.g. 64KB) in the worker — this is a Phase 1 item, not deferred to Phase 9, since an uncapped submission can exhaust resources before auth or rate limiting exist to stop it
-- [ ] `[CORRECTED]` Every query in this phase takes only a hardcoded ID or a route `slug` param — never a client-supplied filter object. No general-purpose query endpoint exists yet, so this is enforced by absence, not by validation code (validation code arrives in Phase 3)
-- [ ] Entire pipeline demonstrable via curl/Postman
+**What was actually confirmed on the real dev machine** (not assumed):
+Docker Compose brought up Mongo/Redis/Piston; `npm run build` passed;
+`npm run seed` succeeded; the API started on `:4000`; the worker started as
+a separate process; `POST /api/submissions` returned a submission in
+`QUEUED`; the worker picked up the job, called Piston, and a real
+submission reached `PASSED` with `passedCount=2, totalCount=2`.
 
-Do not proceed until this actually works end to end.
+**What has NOT been confirmed** — do not treat these as done:
+- [ ] `FAILED` on an intentionally wrong solution
+- [ ] `TIMEOUT` on a genuinely long-running submission
+- [ ] `ERROR` (compile or runtime) on broken code
+- [ ] Idempotency: enqueuing the same submission twice, terminal-state guard actually observed under a duplicate/late write
+- [ ] The 64KB source-code and stdout caps actually triggering
+- [ ] `202` status code observed explicitly (the flow succeeded, but the exact status code wasn't captured in the verification transcript)
+
+Do not mark the remaining Phase 1 items done without actually running them —
+Phase 2 was built on top of the parts that *are* confirmed working, which is
+enough to build on, but the gaps above are still real gaps.
 
 ---
 
-## PHASE 2 — Evaluation Engine
+## PHASE 2 — Evaluation Engine — **implemented, pending verification**
 
 Expand the judge into a full evaluation system: visible/hidden/edge-case test
 cases, test categories, expected outputs, execution errors, timeout handling,
@@ -68,6 +73,12 @@ The deterministic judge remains the sole authority on correctness. AI is never
 part of this phase.
 
 Same query constraint as Phase 1 applies: no client-supplied filters yet.
+
+**Status:** code implemented against the actual installed dependency
+versions (see `docs/ARCHITECTURE.md`). Not yet run. See
+`docs/ARCHITECTURE.md`'s Phase 2 section for the full list of changes,
+including one documented scope addition (read-only `GET /api/challenges`
+and `GET /api/challenges/:slug`) not explicit in the original phase text.
 
 ---
 

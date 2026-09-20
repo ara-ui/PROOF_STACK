@@ -8,6 +8,11 @@ const testCaseSchema = new Schema(
     input: { type: String, required: true },
     expectedOutput: { type: String, required: true },
     isHidden: { type: Boolean, required: true, default: false },
+    // Phase 2: lets results report "Basic: 8/8, Edge Cases: 4/5" instead
+    // of one flat pass count. Free-form string rather than an enum —
+    // challenge authors coin categories as needed; nothing downstream
+    // depends on a fixed set of names.
+    category: { type: String, required: true, default: 'general' },
   },
   { _id: false },
 );

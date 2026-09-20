@@ -6,10 +6,20 @@ const testCaseResultSchema = new Schema(
     index: { type: Number, required: true },
     passed: { type: Boolean, required: true },
     isHidden: { type: Boolean, required: true },
+    category: { type: String, required: true },
     actualOutput: { type: String },
     expectedOutput: { type: String },
     timeMs: { type: Number },
     truncated: { type: Boolean },
+  },
+  { _id: false },
+);
+
+const categoryBreakdownSchema = new Schema(
+  {
+    category: { type: String, required: true },
+    passed: { type: Number, required: true },
+    total: { type: Number, required: true },
   },
   { _id: false },
 );
@@ -19,6 +29,7 @@ const resultSchema = new Schema(
     passedCount: { type: Number, required: true },
     totalCount: { type: Number, required: true },
     testResults: { type: [testCaseResultSchema], required: true },
+    categoryBreakdown: { type: [categoryBreakdownSchema], required: true },
   },
   { _id: false },
 );
