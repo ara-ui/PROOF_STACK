@@ -82,21 +82,25 @@ and `GET /api/challenges/:slug`) not explicit in the original phase text.
 
 ---
 
-## PHASE 3 — Authentication & Authorization
+## PHASE 3 — Authentication & Authorization — **implemented, not yet run**
 
 Registration, login, password hashing (bcrypt), access-token auth, refresh
 tokens per the blueprint, password reset if retained, request validation,
 ownership checks, NoSQL-injection protection, secret handling.
 
 **Acceptance criteria:**
-- [ ] Users can securely register/login
-- [ ] Protected routes reject unauthenticated users
-- [ ] User A cannot access User B's submissions (404, not 403)
-- [ ] Malformed auth input rejected by Zod before it reaches any query
-- [ ] `[CORRECTED]` Rate limiting on `POST /submissions` is built here (not tested-for-the-first-time in Phase 9) — this endpoint costs real judge compute and is MUST HAVE per the blueprint
-- [ ] `[CORRECTED]` Mass-assignment protection is explicit: no `new User(req.body)`, no `findByIdAndUpdate(id, req.body)` anywhere. Every write is constructed from named, Zod-parsed fields only
-- [ ] `email`/`password` schemas validate type and format before any Mongo query touches them; `mongoose.set('sanitizeFilter', true)` as defence in depth
-- [ ] Token/reset-token handling follows the blueprint (hashed at rest, single-use reset tokens, identical response whether or not an email exists)
+- [ ] Users can securely register/login — implemented, not yet run
+- [ ] Protected routes reject unauthenticated users — implemented, not yet run
+- [ ] User A cannot access User B's submissions (404, not 403) — implemented, not yet run
+- [ ] Malformed auth input rejected by Zod before it reaches any query — implemented, not yet run
+- [ ] `[CORRECTED]` Rate limiting on `POST /submissions` is built here (not tested-for-the-first-time in Phase 9) — this endpoint costs real judge compute and is MUST HAVE per the blueprint — implemented (Redis-backed, 10/min/user), not yet run
+- [ ] `[CORRECTED]` Mass-assignment protection is explicit: no `new User(req.body)`, no `findByIdAndUpdate(id, req.body)` anywhere. Every write is constructed from named, Zod-parsed fields only — implemented, not yet run
+- [ ] `email`/`password` schemas validate type and format before any Mongo query touches them; `mongoose.set('sanitizeFilter', true)` as defence in depth — implemented, not yet run
+- [ ] Token/reset-token handling follows the blueprint (hashed at rest, single-use reset tokens, identical response whether or not an email exists) — implemented, not yet run. **Limitation**: no email provider exists (explicitly out of scope), so the reset token is only returned in the API response outside production, as a dev-only testing affordance — see `docs/ARCHITECTURE.md`'s Phase 3 section.
+
+See `docs/ARCHITECTURE.md`'s Phase 3 section for the full security model
+(token expiry/rotation/revocation, ownership semantics) and the complete
+file-by-file change list.
 
 ---
 

@@ -1,8 +1,6 @@
-// Phase 1 has no authentication. This constant stands in for `req.user.id`
-// everywhere a real user identity would otherwise come from a verified
-// token. It is the ONLY place this value is defined — nothing else should
-// hardcode the string directly. Deleted in Phase 3 when real auth lands.
-export const HARDCODED_USER_ID = 'phase1-dev-user';
+// Phase 3: HARDCODED_USER_ID has been removed. Every submission's userId
+// now comes from req.user.id, set by the auth middleware from a verified
+// JWT — see src/middleware/auth.ts and src/services/submission.service.ts.
 
 // Source code size cap, enforced in the Zod validator (rejects the request)
 // and again at the schema level (defence in depth). 64KB per the frozen

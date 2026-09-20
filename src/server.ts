@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { connectMongo } from './config/db';
 import { submissionRouter } from './routes/submission.routes';
 import { challengeRouter } from './routes/challenge.routes';
+import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 async function main() {
@@ -17,6 +18,7 @@ async function main() {
 
   app.use('/api', submissionRouter);
   app.use('/api', challengeRouter);
+  app.use('/api', authRouter);
 
   app.use(errorHandler);
 

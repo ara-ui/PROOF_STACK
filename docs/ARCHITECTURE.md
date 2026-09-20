@@ -178,3 +178,129 @@ restart the API and worker, then `GET /api/challenges` and
 `GET /api/challenges/:slug:` and confirm hidden test inputs/outputs never
 appear in either response, then submit against `fizzbuzz` or `max-in-array`
 and confirm `categoryBreakdown` is present and correct on the result.
+
+## Phase 3 — implemented, pending verification
+
+Authentication and authorization, per the frozen roadmap. Removes the
+Phase 1 `HARDCODED_USER_ID` dependency entirely — every submission's
+`userId` now comes from a verified JWT.
+
+### Security model (explicit, as required before implementation)
+
+**Access token**: JWT, `HS256` pinned on both sign and verify (algorithm
+confusion is the single most common JWT vulnerability — see the blueprint's
+security review), payload `{sub: userId, email}`, 24h expiry
+(`JWT_ACCESS_TOKEN_TTL`, default `24h`). Secret is `JWT_SECRET` — required,
+minimum 32 characters, no default; the server fails fast at startup if it's
+missing or too short, consistent with Phase 0's existing env-validation
+pattern (see `src/config/env.ts`).
+
+**Refresh token**: opaque random 32-byte token (not a JWT), SHA-256 hash
+stored in a new `RefreshToken` collection — the raw value is returned to
+the client exactly once and never persisted. 30-day expiry
+(`REFRESH_TOKEN_TTL_DAYS`, not specified in the docs — this project's
+default). **Rotated on every use**: each `POST /auth/refresh` call
+revokes the presented token and issues a new one. **Reuse detection**: if
+an already-revoked refresh token is presented again, every refresh token
+belonging to that user is revoked — the standard response to a token
+turning up twice, which usually means it was copied/stolen and is being
+used by two parties at once.
+
+**Password reset**: `PasswordResetToken`, SHA-256 hash at rest, 30-minute
+expiry (`RESET_TOKEN_TTL_MINUTES`), single-use (`usedAt` checked, not just
+relied on TTL). `POST /auth/forgot-password` returns the identical
+`{ok: true}` response whether or not the email exists — required per the
+blueprint's anti-enumeration rule. **Documented limitation**: there is no
+email provider, and adding one is explicitly out of scope for this phase.
+The raw reset token is included in the response body **only when
+`NODE_ENV !== 'production'`** — a dev-only testing affordance, not a
+delivery mechanism. In production, a user who requests a reset currently
+has no way to receive the token; that's a real, known gap, not hidden
+behavior. On a successful reset, every refresh token for that user is
+revoked (forces re-login everywhere, per the blueprint).
+
+**Ownership**: `Submission.userId` stayed a `String` field rather than
+becoming an `ObjectId` ref, specifically to avoid a schema migration on
+existing Phase 1/2 data. `req.user.id` (the JWT's `sub` claim, already a
+string) is compared directly. A submission that exists but belongs to
+someone else returns the same 404 as one that doesn't exist — never 403 —
+per the blueprint's explicit anti-enumeration rule for submissions too.
+
+**Rate limiting**: built as a small Redis-backed fixed-window limiter
+(`src/middleware/rateLimit.ts`) using the *existing* `ioredis` dependency,
+rather than adding `express-rate-limit`. 5 requests / 15 min / IP on
+register, login, refresh, and forgot-password. 10 requests / min / user on
+`POST /submissions` (per the blueprint's explicit "10/min is fine") — this
+was a Phase 3 MUST HAVE per the roadmap's corrected acceptance criteria,
+not deferred to later hardening, since submissions cost real judge compute
+and Phase 1/2 had no real per-user identity to rate-limit against yet. The
+limiter fails open on a Redis error (logged, not blocking) rather than
+taking auth/submissions down if Redis has a blip.
+
+**Mass assignment / NoSQL injection**: every auth write is constructed from
+named fields extracted from Zod-parsed input — `User.create({email,
+passwordHash})`, never `new User(req.body)`. `email`/`password` are
+`z.string().email()` / `z.string().min(...)` before anything reaches a
+query. `mongoose.set('sanitizeFilter', true)` (Phase 0) remains active as
+defence in depth.
+
+**Password hashing**: `bcryptjs`, not native `bcrypt` — pure JS, no native
+compilation step, chosen specifically because this project is developed on
+Windows and has already hit enough native-dependency/environment friction.
+Cost factor 12, per the blueprint's explicit recommendation.
+
+### New dependencies (unavoidable, flagged explicitly)
+
+`bcryptjs` and `jsonwebtoken`, plus `@types/bcryptjs` and
+`@types/jsonwebtoken`. No existing dependency versions were changed.
+Deliberately **not** added: `express-rate-limit` (built the limiter on the
+existing `ioredis` dependency instead).
+
+### New environment variables (`.env.example` updated, `.env` untouched)
+
+`JWT_SECRET` (required, no default — **you must add this to your real
+`.env` yourself**, the server will refuse to start without it),
+`JWT_ACCESS_TOKEN_TTL` (default `24h`), `REFRESH_TOKEN_TTL_DAYS` (default
+`30`), `RESET_TOKEN_TTL_MINUTES` (default `30`).
+
+### New files
+
+`src/models/User.ts`, `src/models/RefreshToken.ts`,
+`src/models/PasswordResetToken.ts`, `src/types/express.d.ts` (Request.user
+augmentation), `src/services/token.service.ts` (JWT + opaque token
+utilities), `src/services/password.service.ts` (bcryptjs wrapper),
+`src/services/auth.service.ts` (register/login/refresh/logout/forgot/reset
+business logic), `src/validators/auth.validator.ts`,
+`src/middleware/auth.ts` (`requireAuth`), `src/middleware/rateLimit.ts`,
+`src/controllers/auth.controller.ts`, `src/routes/auth.routes.ts`.
+
+### Modified files
+
+`src/config/env.ts` (new auth env vars), `src/config/constants.ts`
+(`HARDCODED_USER_ID` removed), `src/server.ts` (mounts `authRouter`),
+`src/services/submission.service.ts` (`createSubmission`/`getSubmissionById`
+now take a real `userId`; ownership check added), `src/controllers/
+submission.controller.ts` (passes `req.user.id` through),
+`src/routes/submission.routes.ts` (`requireAuth` + rate limiting on
+`POST /submissions`, `requireAuth` on the `GET`), `package.json` (two new
+deps, no version changes to existing ones), `.env.example`.
+
+### Untouched (confirmed no Phase 3 need)
+
+`.env`, `docker-compose.yml`, `tsconfig.json`, all Phase 2 challenge code
+(`challenge.service.ts`, `challenge.controller.ts`, `challenge.routes.ts` —
+challenge reads remain public, unauthenticated, per the blueprint's API
+list), `piston.service.ts`, `evaluation.worker.ts`, `evaluationQueue.ts`,
+`Challenge.ts`, `errorHandler.ts`, `asyncHandler.ts`.
+
+### Not verified yet
+
+Same caveat as every prior phase: written and statically checked (stub-typed
+TypeScript pass against the real Zod 4/Express 5/Mongoose 9/jsonwebtoken/
+bcryptjs API shapes — zero new type errors beyond the one pre-existing
+`Types.ObjectId.isValid` stub-fidelity false positive already confirmed
+harmless in earlier phases), but not run. Before trusting it: `npm run
+build`, add `JWT_SECRET` to your real `.env`, restart both processes, then
+register, login, submit (confirm it's tied to your real user, not the old
+hardcoded one), try accessing another user's submission (expect 404),
+refresh, and confirm rate limiting kicks in after repeated rapid requests.

@@ -14,8 +14,16 @@ export async function create(req: Request, res: Response) {
     return;
   }
 
+  // requireAuth has already run (see submission.routes.ts) — req.user is
+  // guaranteed set on this path, but the type is still optional, so this
+  // is a real check, not a non-null assertion.
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
   try {
-    const result = await createSubmission(parsed.data);
+    const result = await createSubmission(req.user.id, parsed.data);
     // 202: accepted, evaluation happens asynchronously. The API never
     // waits on the worker/judge here.
     res.status(202).json(result);
@@ -35,8 +43,13 @@ export async function getById(req: Request, res: Response) {
     return;
   }
 
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
   try {
-    const submission = await getSubmissionById(parsed.data.id);
+    const submission = await getSubmissionById(parsed.data.id, req.user.id);
     res.status(200).json(submission);
   } catch (err) {
     if (err instanceof SubmissionNotFoundError) {
